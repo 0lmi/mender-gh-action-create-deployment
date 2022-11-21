@@ -73,10 +73,6 @@ jobs:
             fi
           done
       # Creates Mender Artifact
-      - name: test
-        run: |
-          echo $MENDER_DEVICE_IDS
-          echo ---
       - name: Create Mender Artifact
         run: |
           echo /home/root/.ssh > dest_dir
@@ -110,11 +106,14 @@ jobs:
           mender_devices_list: ${{ env.MENDER_DEVICE_IDS }}
       - name: Wait while the deloyment finishes
         run: |
-          while true; do
-            pending_deployments_count=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
+          deployment_id=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
               -H "Accept: application/json" \
-              -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq '.[].id' | wc -l)
-            if [ "${pending_deployments_count}" -eq 0 ]; then
+              -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq -r '.[].id')
+          while true; do
+            status=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments/${deployment_id} \
+              -H "Accept: application/json" \
+              -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq -r '.status')
+            if [ "${status}" == "finished" ]; then
               break
             fi
             sleep 1
