@@ -100,10 +100,12 @@ jobs:
           mender_release_name: ${{ env.MENDER_RELEASE_NAME }}
           mender_devices_list: ${{ env.MENDER_DEVICE_IDS }}
       - name: Wait while the deloyment finishes
+        if: always()
         run: |
           deployment_id=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
               -H "Accept: application/json" \
               -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq -r '.[].id')
+          count=0
           while true; do
             status=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments/${deployment_id} \
               -H "Accept: application/json" \
@@ -111,20 +113,22 @@ jobs:
             if [ "${status}" == "finished" ]; then
               break
             fi
-            sleep 1
+            let count=$count+1
+            [ $count -ge 100 ] && { echo "ERROR: deployment '$deployment_id' isn't finished"; exit 1; }
+            sleep 2
           done
-          exit 1
-      - name: Cleanup
+      - name: Cleanup - delete artifact
         if: always()
         run: |
-          # delete artifact
           artifact_id=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/artifacts/list?name=change-the-world-to-better-v1.0 \
             -H "Accept: application/json" \
             -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq -r '.[].id')
           curl -s -X DELETE ${MENDER_SERVER_URL}/api/management/v1/deployments/artifacts/${artifact_id} \
             -H "Accept: application/json" \
             -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
-          # delete device
+      - name: Cleanup - delete device
+        if: always()
+        run: |
           curl -s -X DELETE ${MENDER_SERVER_URL}/api/management/v2/devauth/devices/${MENDER_DEVICE_ID} \
             -H "Accept: application/json" \
             -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
