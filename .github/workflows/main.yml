@@ -68,11 +68,15 @@ jobs:
                 -H "Accept: application/json" \
                 -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" \
                 -d "{\"status\": \"accepted\"}"
-                echo "MENDER_DEVICE_IDS=[\"${id}\"]" >> ${GITHUB_ENV}
+                echo "MENDER_DEVICE_IDS=[\\\"${id}\\\"]" >> ${GITHUB_ENV}
                 break
             fi
           done
       # Creates Mender Artifact
+      - name: test
+        run: |
+          echo $MENDER_DEVICE_IDS
+          echo ---
       - name: Create Mender Artifact
         run: |
           echo /home/root/.ssh > dest_dir
