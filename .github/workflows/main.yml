@@ -29,7 +29,7 @@ jobs:
         run: |
           curl -O https://raw.githubusercontent.com/mirzak/bash-mender-client/d5a4ded71404f8526362f5b94e7f79065cfced09/mender-client.sh
           chmod +x mender-client.sh
-          apk add openssl
+          apk add openssl jq
           mkdir keys
           openssl genpkey -algorithm RSA -out keys/private.key -pkeyopt rsa_keygen_bits:3072
           openssl rsa -in keys/private.key -out keys/private.key
@@ -38,7 +38,6 @@ jobs:
       - name: Start Mender bash client and accept the device
         run: |
           # check number of pending devices
-          apk add jq
           get_pending_devices_count() {
             local file=$1
             curl -s -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" "${MENDER_SERVER_URL}/api/management/v2/devauth/devices?status=pending" > ${file}
@@ -111,20 +110,14 @@ jobs:
           mender_devices_list: ${{ env.MENDER_DEVICE_IDS }}
       - name: Wait while the deloyment finishes
         run: |
-          sleep 5
           while true; do
-          curl -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
-              -H "Accept: application/json" \
-              -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq '.'
             pending_deployments_count=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
               -H "Accept: application/json" \
               -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq '.[].id' | wc -l)
             if [ "${pending_deployments_count}" -eq 0 ]; then
-          curl -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
-              -H "Accept: application/json" \
-              -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq '.'
               break
             fi
+            sleep 1
           done
       - name: Cleanup
         run: |
@@ -139,3 +132,4 @@ jobs:
           curl -s -X DELETE ${MENDER_SERVER_URL}/api/management/v2/devauth/devices/${MENDER_DEVICE_ID} \
             -H "Accept: application/json" \
             -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
+
