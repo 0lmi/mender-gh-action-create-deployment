@@ -27,7 +27,7 @@ jobs:
       # Download Mender bash client
       - name: Setup Mender bash client
         run: |
-          curl -O https://raw.githubusercontent.com/mirzak/bash-mender-client/master/mender-client.sh
+          curl -O https://raw.githubusercontent.com/mirzak/bash-mender-client/d5a4ded71404f8526362f5b94e7f79065cfced09/mender-client.sh
           chmod +x mender-client.sh
           apk add openssl
           mkdir keys
@@ -48,7 +48,7 @@ jobs:
           BEFORE_DEVICES=/tmp/devauth.json
           BEFORE_DEVICES_COUNT="$(get_pending_devices_count ${BEFORE_DEVICES})"
           # start Mender bash client
-          ./mender-client.sh -d raspberrypi4 -t ${{ secrets.MENDER_TENANT_TOKEN }} 2>&1 >/dev/null &
+          ./mender-client.sh -s "${MENDER_SERVER_URL}" -k ./keys -d raspberrypi4 -t ${{ secrets.MENDER_TENANT_TOKEN }} 2>&1 >/dev/null &
           # wait while the device appears in pending
           CURRENT_DEVICES=/tmp/devauth_current.json
           count=0
@@ -69,6 +69,7 @@ jobs:
                 -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" \
                 -d "{\"status\": \"accepted\"}"
                 echo "MENDER_DEVICE_IDS=[\\\"${id}\\\"]" >> ${GITHUB_ENV}
+                echo "MENDER_DEVICE_ID=${id}" >> ${GITHUB_ENV}
                 break
             fi
           done
@@ -108,15 +109,24 @@ jobs:
           mender_deployment_name: ${{ env.MENDER_DEPLOYMENT_NAME }}
           mender_release_name: ${{ env.MENDER_RELEASE_NAME }}
           mender_devices_list: ${{ env.MENDER_DEVICE_IDS }}
-      - name: SOUT
-        run: |
-          curl -s -X GET https://hosted.mender.io/api/management/v1/deployments/deployments?status=pending \
-            -H "Accept: application/json" \
-            -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
       - name: Wait while the deloyment finishes
         run: |
-          sleep 180
-          curl -s -X GET https://hosted.mender.io/api/management/v1/deployments/deployments?status=pending \
+          while true; do
+            pending_deployments_count=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/deployments?status=pending \
+              -H "Accept: application/json" \
+              -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq '.[].id' | wc -l)
+            [ "${pending_deployments_count}" -eq 0 ] && break
+          done
+      - name: Cleanup
+        run: |
+          # delete artifact
+          artifact_id=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/artifacts/list?name=change-the-world-to-better-v1.0 \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}" | jq -r '.[].id')
+          curl -s -X DELETE ${MENDER_SERVER_URL}/api/management/v1/deployments/artifacts/{id} \
             -H "Accept: application/json" \
             -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
-      # TODO: cleanup: delete release, delete device
+          # delete device
+          curl -s -X DELETE ${MENDER_SERVER_URL}/api/management/v2/devauth/devices/${MENDER_DEVICE_ID} \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
