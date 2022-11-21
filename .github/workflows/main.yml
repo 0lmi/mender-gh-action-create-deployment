@@ -1,17 +1,12 @@
 name: Build and Deploy to a Single Device
 
-on:
-  push:
-    branches:
-      - main
-      - master
+on: [push]
 
 env:
   MENDER_SERVER_URL: https://hosted.mender.io           # Mender server URL
   MENDER_DEPLOYMENT_NAME: my-app-v1.0-dev               # Mender deployment name
   MENDER_RELEASE_NAME: change-the-world-to-better-v1.0  # Mender release name
   MENDER_ARTIFACT_NAME: artifact.mender                 # Mender artifact name
-  MENDER_DEVICES_LIST: '[\"5ca6090ff3a8e90001206535\"]' # List of devices to deploy built artifact to
 
 
 jobs:
@@ -118,7 +113,9 @@ jobs:
             fi
             sleep 1
           done
+          exit 1
       - name: Cleanup
+        if: always()
         run: |
           # delete artifact
           artifact_id=$(curl -s -X GET ${MENDER_SERVER_URL}/api/management/v1/deployments/artifacts/list?name=change-the-world-to-better-v1.0 \
