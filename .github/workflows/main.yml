@@ -108,4 +108,13 @@ jobs:
           mender_deployment_name: ${{ env.MENDER_DEPLOYMENT_NAME }}
           mender_release_name: ${{ env.MENDER_RELEASE_NAME }}
           mender_devices_list: ${{ env.MENDER_DEVICE_IDS }}
+      - name: Wait while the deloyment finishes
+        run: |
+          curl -s -X GET https://hosted.mender.io/api/management/v1/deployments/deployments?status=pending \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
+          sleep 60
+          curl -s -X GET https://hosted.mender.io/api/management/v1/deployments/deployments?status=pending \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer ${{ secrets.MENDER_SERVER_ACCESS_TOKEN }}"
       # TODO: cleanup: delete release, delete device
